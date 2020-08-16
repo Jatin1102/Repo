@@ -5,6 +5,8 @@ const ejs = require("ejs");
 const mongoose = require("mongoose");
 const md5 = require("md5");
 const app = express();
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static("public"));
@@ -34,14 +36,15 @@ app.post("/login", function (req, res) {
   secretModel.findOne({ email: req.body.username }, function (err, result) {
     if (!err) {
       if (result) {
-        if (result.password === md5(req.body.password)) {
-          res.render("secrets");
-        }
-      } else {
-        res.render("Email not found");
+        bcrypt.compare(req.body.password, result.password, function (
+          err,
+          hashResult
+        ) {
+          if (hashResult === true) {
+            res.render("secrets");
+          }
+        });
       }
-    } else {
-      res.render(err);
     }
   });
 });
@@ -51,15 +54,21 @@ app.get("/register", function (req, res) {
   res.render("register");
 });
 app.post("/register", function (req, res) {
-  const secretObject = new secretModel({
-    email: req.body.username,
-    password: md5(req.body.password),
-  });
-  secretObject.save(function (err) {
+  bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
     if (!err) {
-      res.render("secrets");
+      const secretObject = new secretModel({
+        email: req.body.username,
+        password: hash,
+      });
+      secretObject.save(function (err) {
+        if (!err) {
+          res.render("secrets");
+        } else {
+          console.log(err);
+        }
+      });
     } else {
-      console.log(err);
+      res.render(err);
     }
   });
 });
